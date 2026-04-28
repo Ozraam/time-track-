@@ -65,8 +65,8 @@ router.get('/today', (req, res) => {
 router.get('/:year/:month', (req, res) => {
   const { year, month } = req.params;
 
-  if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || +month < 1 || +month > 12) {
-    return res.status(400).json({ error: 'Invalid year or month format' });
+  if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || +month < 1 || +month > 12 || +year < 1900 || +year > 2100) {
+    return res.status(400).json({ error: 'Invalid year or month' });
   }
 
   try {
