@@ -14,9 +14,10 @@ export const useEntriesStore = defineStore('entries', () => {
   }
 
   async function fetchMonth(year, month) {
-    const res = await axios.get(`/api/entries/${year}/${month}`)
+    const mm = String(month).padStart(2, '0')
+    const res = await axios.get(`/api/entries/${year}/${mm}`)
     monthEntries.value = res.data.entries
-    cumulativeBalance.value = res.data.cumulativeBalance
+    cumulativeBalance.value = res.data.cumulative_balance
   }
 
   async function doAction() {

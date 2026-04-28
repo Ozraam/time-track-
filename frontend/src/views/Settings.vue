@@ -129,7 +129,6 @@
 
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
-import axios from 'axios'
 import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
@@ -181,15 +180,12 @@ async function handleSave() {
 
   try {
     await settingsStore.saveSettings(payload)
-    if (form.newPassword) {
-      await axios.put('/api/auth/password', { password: form.newPassword })
-    }
     form.newPassword = ''
     form.confirmPassword = ''
     success.value = true
     setTimeout(() => (success.value = false), 3000)
   } catch (e) {
-    error.value = e.response?.data?.message || 'Erreur lors de la sauvegarde'
+    error.value = e.response?.data?.error || 'Erreur lors de la sauvegarde'
   }
 }
 </script>

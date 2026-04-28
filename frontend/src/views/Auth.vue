@@ -140,7 +140,7 @@ async function handleLogin() {
     auth.setAuth(res.data.token, res.data.user)
     router.push('/')
   } catch (e) {
-    error.value = e.response?.data?.message || 'Identifiants incorrects'
+    error.value = e.response?.data?.error || 'Identifiants incorrects'
   } finally {
     loading.value = false
   }
@@ -161,7 +161,7 @@ async function handleRegister() {
     auth.setAuth(res.data.token, res.data.user)
     router.push('/')
   } catch (e) {
-    error.value = e.response?.data?.message || "Erreur lors de l'inscription"
+    error.value = e.response?.data?.error || "Erreur lors de l'inscription"
   } finally {
     loading.value = false
   }

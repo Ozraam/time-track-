@@ -175,7 +175,7 @@ const dailyTarget = computed(() => settingsStore.settings.daily_target)
 const entryByDay = computed(() => {
   const map = {}
   for (const e of entries.monthEntries) {
-    const d = new Date(e.date)
+    const d = new Date(e.day_date + 'T00:00:00')
     map[d.getDate()] = e
   }
   return map

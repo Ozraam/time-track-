@@ -13,8 +13,8 @@ export const useSettingsStore = defineStore('settings', () => {
   async function fetchSettings() {
     loading.value = true
     try {
-      const res = await axios.get('/api/settings')
-      settings.value = res.data
+      const res = await axios.get('/api/user/settings')
+      settings.value = res.data.user
     } finally {
       loading.value = false
     }
@@ -23,8 +23,8 @@ export const useSettingsStore = defineStore('settings', () => {
   async function saveSettings(data) {
     loading.value = true
     try {
-      const res = await axios.put('/api/settings', data)
-      settings.value = res.data
+      const res = await axios.put('/api/user/settings', data)
+      settings.value = res.data.user
     } finally {
       loading.value = false
     }
