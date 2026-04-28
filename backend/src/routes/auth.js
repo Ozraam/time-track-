@@ -1,9 +1,20 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const db = require('../db/database');
 
 const router = express.Router();
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+router.use(authLimiter);
 
 function generateToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -27,7 +38,8 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // Simple, safe email check — avoid ReDoS-prone nested quantifiers
+  if (typeof email !== 'string' || !email.includes('@') || email.length > 254) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 

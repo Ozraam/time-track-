@@ -65,17 +65,22 @@ router.get('/today', (req, res) => {
 router.get('/:year/:month', (req, res) => {
   const { year, month } = req.params;
 
-  if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month)) {
+  if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || +month < 1 || +month > 12) {
     return res.status(400).json({ error: 'Invalid year or month format' });
   }
 
   try {
     const prefix = `${year}-${month}`;
+    // Compute the first day of the next month for a range query (avoids LIKE)
+    const nextMonth = +month === 12
+      ? `${+year + 1}-01-01`
+      : `${year}-${String(+month + 1).padStart(2, '0')}-01`;
+
     const entries = db.prepare(
       `SELECT * FROM work_entries
-       WHERE user_id = ? AND day_date LIKE ?
+       WHERE user_id = ? AND day_date >= ? AND day_date < ?
        ORDER BY day_date ASC`
-    ).all(req.userId, `${prefix}-%`);
+    ).all(req.userId, `${prefix}-01`, nextMonth);
 
     const cumulative_balance = getCumulativeBalance(req.userId, year, parseInt(month, 10));
 
