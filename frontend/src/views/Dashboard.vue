@@ -29,11 +29,22 @@
       <!-- Time picker (shown after clicking action button) -->
       <div v-if="showTimePicker" class="mb-4 space-y-3">
         <p class="text-sm text-gray-600 font-medium">{{ actionLabel }} — choisir l'heure :</p>
-        <input
-          type="time"
-          v-model="selectedTime"
-          class="w-full text-center text-2xl font-bold border-2 border-indigo-300 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 text-gray-800"
-        />
+        <!-- Custom 24-hour picker: always HH (00-23) : MM (00-59) -->
+        <div class="flex items-center justify-center gap-2">
+          <select
+            v-model="selectedHour"
+            class="text-3xl font-bold border-2 border-indigo-300 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 text-gray-800 bg-white text-center appearance-none w-24"
+          >
+            <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+          </select>
+          <span class="text-3xl font-bold text-gray-600">:</span>
+          <select
+            v-model="selectedMinute"
+            class="text-3xl font-bold border-2 border-indigo-300 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 text-gray-800 bg-white text-center appearance-none w-24"
+          >
+            <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </div>
         <div class="flex gap-3">
           <button
             @click="cancelAction"
@@ -141,7 +152,12 @@ const entries = useEntriesStore()
 const settingsStore = useSettingsStore()
 const fetchError = ref('')
 const showTimePicker = ref(false)
-const selectedTime = ref('')
+const selectedHour = ref('00')
+const selectedMinute = ref('00')
+
+// 24-hour hour options (00-23) and minute options (00-59)
+const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 let ticker = null
 
 onMounted(async () => {
@@ -281,8 +297,10 @@ function currentHHmm() {
 
 async function handleAction() {
   if (isFinished.value) return
-  // Show time picker pre-filled with current time
-  selectedTime.value = currentHHmm()
+  // Pre-fill dropdowns with current time
+  const [h, m] = currentHHmm().split(':')
+  selectedHour.value = h
+  selectedMinute.value = m
   showTimePicker.value = true
 }
 
@@ -294,10 +312,9 @@ async function confirmAction() {
   showTimePicker.value = false
   fetchError.value = ''
   try {
-    await entries.doAction(selectedTime.value)
+    await entries.doAction(`${selectedHour.value}:${selectedMinute.value}`)
   } catch (e) {
     fetchError.value = "Erreur lors de l'action"
   }
-  selectedTime.value = ''
 }
 </script>
