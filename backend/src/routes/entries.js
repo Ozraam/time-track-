@@ -94,6 +94,16 @@ router.get('/:year/:month', (req, res) => {
 // POST /api/entries/action - advance today's entry to the next state
 router.post('/action', (req, res) => {
   try {
+    // Allow optional time override (HH:mm)
+    let actionTime = nowTime();
+    if (req.body && req.body.time) {
+      const timeMatch = /^(\d{2}):(\d{2})$/.exec(req.body.time);
+      if (!timeMatch || +timeMatch[1] > 23 || +timeMatch[2] > 59) {
+        return res.status(400).json({ error: 'Invalid time format. Expected HH:mm (00:00–23:59)' });
+      }
+      actionTime = req.body.time;
+    }
+
     const user = db.prepare(
       'SELECT daily_target FROM users WHERE id = ?'
     ).get(req.userId);
@@ -103,7 +113,7 @@ router.post('/action', (req, res) => {
     }
 
     const today = todayDate();
-    const now = nowTime();
+    const now = actionTime;
     let entry = db.prepare(
       'SELECT * FROM work_entries WHERE user_id = ? AND day_date = ?'
     ).get(req.userId, today);

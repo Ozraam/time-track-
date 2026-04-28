@@ -25,7 +25,36 @@
     <!-- Action Button Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
       <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Action suivante</p>
+
+      <!-- Time picker (shown after clicking action button) -->
+      <div v-if="showTimePicker" class="mb-4 space-y-3">
+        <p class="text-sm text-gray-600 font-medium">{{ actionLabel }} — choisir l'heure :</p>
+        <input
+          type="time"
+          v-model="selectedTime"
+          class="w-full text-center text-2xl font-bold border-2 border-indigo-300 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 text-gray-800"
+        />
+        <div class="flex gap-3">
+          <button
+            @click="cancelAction"
+            class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-all"
+          >
+            Annuler
+          </button>
+          <button
+            @click="confirmAction"
+            :disabled="entries.loading"
+            :class="actionButtonClass"
+            class="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <span v-if="entries.loading">Chargement...</span>
+            <span v-else>Confirmer</span>
+          </button>
+        </div>
+      </div>
+
       <button
+        v-else
         @click="handleAction"
         :disabled="isFinished || entries.loading"
         :class="actionButtonClass"
@@ -111,6 +140,8 @@ import StatusChip from '../components/StatusChip.vue'
 const entries = useEntriesStore()
 const settingsStore = useSettingsStore()
 const fetchError = ref('')
+const showTimePicker = ref(false)
+const selectedTime = ref('')
 let ticker = null
 
 onMounted(async () => {
@@ -243,13 +274,30 @@ const estimatedEnd = computed(() => {
   return `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
 })
 
+function currentHHmm() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
 async function handleAction() {
   if (isFinished.value) return
+  // Show time picker pre-filled with current time
+  selectedTime.value = currentHHmm()
+  showTimePicker.value = true
+}
+
+function cancelAction() {
+  showTimePicker.value = false
+}
+
+async function confirmAction() {
+  showTimePicker.value = false
   fetchError.value = ''
   try {
-    await entries.doAction()
+    await entries.doAction(selectedTime.value)
   } catch (e) {
     fetchError.value = "Erreur lors de l'action"
   }
+  selectedTime.value = ''
 }
 </script>

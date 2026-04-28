@@ -20,10 +20,11 @@ export const useEntriesStore = defineStore('entries', () => {
     cumulativeBalance.value = res.data.cumulative_balance
   }
 
-  async function doAction() {
+  async function doAction(time = null) {
     loading.value = true
     try {
-      const res = await axios.post('/api/entries/action')
+      const payload = time ? { time } : {}
+      const res = await axios.post('/api/entries/action', payload)
       todayEntry.value = res.data.entry
     } finally {
       loading.value = false
