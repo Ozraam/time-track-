@@ -165,6 +165,24 @@ router.put('/:id', (req, res) => {
   const { id } = req.params;
   const { start_time, lunch_start, lunch_end, end_time } = req.body;
 
+  // Validate time format for any provided field
+  const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  function isValidTime(t) {
+    if (t === null || t === undefined) return true;
+    return TIME_RE.test(t);
+  }
+
+  for (const [name, val] of [
+    ['start_time', start_time],
+    ['lunch_start', lunch_start],
+    ['lunch_end', lunch_end],
+    ['end_time', end_time],
+  ]) {
+    if (val !== undefined && !isValidTime(val)) {
+      return res.status(400).json({ error: `Invalid time for ${name}. Expected HH:mm (00:00–23:59) or null` });
+    }
+  }
+
   try {
     const entry = db.prepare(
       'SELECT * FROM work_entries WHERE id = ? AND user_id = ?'

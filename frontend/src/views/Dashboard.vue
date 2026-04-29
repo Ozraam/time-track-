@@ -26,9 +26,9 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
       <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Action suivante</p>
 
-      <!-- Time picker (shown after clicking action button) -->
+      <!-- Time picker (new action OR chip edit) -->
       <div v-if="showTimePicker" class="mb-4 space-y-3">
-        <p class="text-sm text-gray-600 font-medium">{{ actionLabel }} — choisir l'heure :</p>
+        <p class="text-sm text-gray-600 font-medium">{{ pickerTitle }}</p>
         <!-- Custom 24-hour picker: always HH (00-23) : MM (00-59) -->
         <div class="flex items-center justify-center gap-2">
           <select
@@ -47,15 +47,15 @@
         </div>
         <div class="flex gap-3">
           <button
-            @click="cancelAction"
+            @click="cancelPicker"
             class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-all"
           >
             Annuler
           </button>
           <button
-            @click="confirmAction"
+            @click="confirmPicker"
             :disabled="entries.loading"
-            :class="actionButtonClass"
+            :class="pickerMode === 'edit' ? 'bg-indigo-600 hover:bg-indigo-700' : actionButtonClass"
             class="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-md transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span v-if="entries.loading">Chargement...</span>
@@ -75,12 +75,24 @@
         <span v-else>{{ actionLabel }}</span>
       </button>
 
-      <!-- Current status chips -->
-      <div v-if="entry" class="mt-4 flex flex-wrap justify-center gap-2">
-        <StatusChip v-if="entry.start_time" icon="🟢" label="Arrivée" :time="entry.start_time" />
-        <StatusChip v-if="entry.lunch_start" icon="🍽️" label="Début pause" :time="entry.lunch_start" />
-        <StatusChip v-if="entry.lunch_end" icon="▶️" label="Reprise" :time="entry.lunch_end" />
-        <StatusChip v-if="entry.end_time" icon="🔴" label="Départ" :time="entry.end_time" />
+      <!-- Current status chips — edit icons shown when picker is not open -->
+      <div v-if="entry && !showTimePicker" class="mt-4 flex flex-wrap justify-center gap-2">
+        <StatusChip
+          v-if="entry.start_time" icon="🟢" label="Arrivée" :time="entry.start_time"
+          editable @edit="openEditPicker('start_time', entry.start_time)"
+        />
+        <StatusChip
+          v-if="entry.lunch_start" icon="🍽️" label="Début pause" :time="entry.lunch_start"
+          editable @edit="openEditPicker('lunch_start', entry.lunch_start)"
+        />
+        <StatusChip
+          v-if="entry.lunch_end" icon="▶️" label="Reprise" :time="entry.lunch_end"
+          editable @edit="openEditPicker('lunch_end', entry.lunch_end)"
+        />
+        <StatusChip
+          v-if="entry.end_time" icon="🔴" label="Départ" :time="entry.end_time"
+          editable @edit="openEditPicker('end_time', entry.end_time)"
+        />
       </div>
     </div>
 
@@ -154,6 +166,9 @@ const fetchError = ref('')
 const showTimePicker = ref(false)
 const selectedHour = ref('00')
 const selectedMinute = ref('00')
+// 'action' = new punch, 'edit' = correcting an existing chip
+const pickerMode = ref('action')
+const editingField = ref(null) // 'start_time' | 'lunch_start' | 'lunch_end' | 'end_time'
 
 // 24-hour hour options (00-23) and minute options (00-59)
 const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
@@ -197,6 +212,20 @@ const actionLabel = computed(() => {
   if (!entry.value.lunch_end) return 'Reprise du travail'
   if (!entry.value.end_time) return 'Débauche'
   return 'Journée terminée ✓'
+})
+
+const FIELD_LABELS = {
+  start_time: 'Arrivée',
+  lunch_start: 'Début pause',
+  lunch_end: 'Reprise',
+  end_time: 'Départ',
+}
+
+const pickerTitle = computed(() => {
+  if (pickerMode.value === 'edit' && editingField.value) {
+    return `Modifier — ${FIELD_LABELS[editingField.value]} :`
+  }
+  return `${actionLabel.value} — choisir l'heure :`
 })
 
 const actionButtonClass = computed(() => {
@@ -295,26 +324,44 @@ function currentHHmm() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
-async function handleAction() {
-  if (isFinished.value) return
-  // Pre-fill dropdowns with current time
-  const [h, m] = currentHHmm().split(':')
-  selectedHour.value = h
-  selectedMinute.value = m
+function openPicker(mode, prefilledTime = null) {
+  const raw = prefilledTime || currentHHmm()
+  const parts = raw.split(':')
+  selectedHour.value = parts[0]?.padStart(2, '0') || '00'
+  selectedMinute.value = parts[1]?.padStart(2, '0') || '00'
+  pickerMode.value = mode
   showTimePicker.value = true
 }
 
-function cancelAction() {
-  showTimePicker.value = false
+async function handleAction() {
+  if (isFinished.value) return
+  openPicker('action')
 }
 
-async function confirmAction() {
+function openEditPicker(field, currentTime) {
+  editingField.value = field
+  openPicker('edit', currentTime)
+}
+
+function cancelPicker() {
+  showTimePicker.value = false
+  editingField.value = null
+}
+
+async function confirmPicker() {
+  const time = `${selectedHour.value}:${selectedMinute.value}`
   showTimePicker.value = false
   fetchError.value = ''
   try {
-    await entries.doAction(`${selectedHour.value}:${selectedMinute.value}`)
+    if (pickerMode.value === 'edit' && editingField.value && entry.value?.id) {
+      await entries.updateEntry(entry.value.id, { [editingField.value]: time })
+    } else {
+      await entries.doAction(time)
+    }
   } catch (e) {
-    fetchError.value = "Erreur lors de l'action"
+    fetchError.value = pickerMode.value === 'edit' ? "Erreur lors de la modification" : "Erreur lors de l'action"
+  } finally {
+    editingField.value = null
   }
 }
 </script>

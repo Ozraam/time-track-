@@ -41,7 +41,7 @@
       <!-- Line Chart -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
         <h2 class="text-sm font-semibold text-gray-700 mb-4">Heures travaillées par jour</h2>
-        <div class="h-56">
+        <div class="h-44 sm:h-56">
           <Line :data="lineChartData" :options="lineChartOptions" />
         </div>
       </div>
@@ -49,7 +49,7 @@
       <!-- Bar Chart -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
         <h2 class="text-sm font-semibold text-gray-700 mb-4">Comparaison journalière</h2>
-        <div class="h-56">
+        <div class="h-44 sm:h-56">
           <Bar :data="barChartData" :options="barChartOptions" />
         </div>
       </div>
@@ -67,13 +67,20 @@
           <div
             v-for="day in daysInMonth"
             :key="day"
-            class="aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium cursor-default"
+            class="aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium cursor-default relative group"
             :class="calendarCellClass(day)"
           >
             <span>{{ day }}</span>
             <span v-if="getDayBalance(day) !== null" class="text-[9px] leading-none mt-0.5">
               {{ getDayBalanceLabel(day) }}
             </span>
+            <!-- Edit icon for days with an entry -->
+            <button
+              v-if="entryByDay[day]"
+              @click.stop="openEditModal(day)"
+              class="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 text-[10px] leading-none text-gray-600 hover:text-indigo-600"
+              aria-label="Modifier"
+            >✏️</button>
           </div>
         </div>
         <!-- Legend -->
@@ -86,6 +93,66 @@
       </div>
     </template>
   </div>
+
+  <!-- Edit entry modal -->
+  <Teleport to="body">
+    <div
+      v-if="editModal.open"
+      class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
+      @click.self="closeEditModal"
+    >
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-gray-800">✏️ Modifier — {{ editModal.dateLabel }}</h3>
+          <button @click="closeEditModal" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        <!-- Time rows -->
+        <div class="space-y-4">
+          <div
+            v-for="field in editModal.fields"
+            :key="field.key"
+            class="flex items-center gap-3"
+          >
+            <span class="w-28 text-sm text-gray-600 shrink-0">{{ field.label }}</span>
+            <div class="flex items-center gap-1">
+              <select
+                v-model="editModal.form[field.key + 'H']"
+                class="border border-gray-300 rounded-lg py-2 px-2 text-sm text-gray-800 bg-white text-center appearance-none w-16 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+              </select>
+              <span class="text-gray-500 font-bold">:</span>
+              <select
+                v-model="editModal.form[field.key + 'M']"
+                class="border border-gray-300 rounded-lg py-2 px-2 text-sm text-gray-800 bg-white text-center appearance-none w-16 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="editModal.error" class="text-sm text-red-600">{{ editModal.error }}</div>
+
+        <div class="flex gap-3 pt-1">
+          <button
+            @click="closeEditModal"
+            class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-all"
+          >
+            Annuler
+          </button>
+          <button
+            @click="saveEditModal"
+            :disabled="entries.loading"
+            class="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all active:scale-95 disabled:opacity-70"
+          >
+            {{ entries.loading ? 'Sauvegarde...' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -327,5 +394,62 @@ function calendarCellClass(day) {
   if (b > 0) return 'bg-blue-200 text-blue-800'
   if (b < 0 && b >= -30) return 'bg-yellow-100 text-yellow-800'
   return 'bg-red-200 text-red-800'
+}
+
+// ─── Edit modal ───────────────────────────────────────────────────────────────
+
+const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+
+const FIELD_DEFS = [
+  { key: 'start_time', label: '🟢 Arrivée' },
+  { key: 'lunch_start', label: '🍽️ Début pause' },
+  { key: 'lunch_end', label: '▶️ Reprise' },
+  { key: 'end_time', label: '🔴 Départ' },
+]
+
+const editModal = ref({
+  open: false,
+  entryId: null,
+  dateLabel: '',
+  fields: [],
+  form: {},
+  error: ''
+})
+
+function openEditModal(day) {
+  const entry = entryByDay.value[day]
+  if (!entry) return
+
+  const date = new Date(currentYear.value, currentMonth.value - 1, day)
+  const dateLabel = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  const fields = FIELD_DEFS.filter(f => entry[f.key])
+  const form = {}
+  for (const f of fields) {
+    const parts = (entry[f.key] || '00:00').split(':')
+    form[f.key + 'H'] = parts[0]?.padStart(2, '0') || '00'
+    form[f.key + 'M'] = parts[1]?.padStart(2, '0') || '00'
+  }
+
+  editModal.value = { open: true, entryId: entry.id, dateLabel, fields, form, error: '' }
+}
+
+function closeEditModal() {
+  editModal.value.open = false
+}
+
+async function saveEditModal() {
+  editModal.value.error = ''
+  const payload = {}
+  for (const f of editModal.value.fields) {
+    payload[f.key] = `${editModal.value.form[f.key + 'H']}:${editModal.value.form[f.key + 'M']}`
+  }
+  try {
+    await entries.updateEntry(editModal.value.entryId, payload)
+    closeEditModal()
+  } catch (e) {
+    editModal.value.error = e.response?.data?.error || 'Erreur lors de la sauvegarde'
+  }
 }
 </script>

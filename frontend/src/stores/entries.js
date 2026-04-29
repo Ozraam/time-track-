@@ -31,5 +31,21 @@ export const useEntriesStore = defineStore('entries', () => {
     }
   }
 
-  return { todayEntry, monthEntries, cumulativeBalance, loading, fetchToday, fetchMonth, doAction }
+  async function updateEntry(id, fields) {
+    loading.value = true
+    try {
+      const res = await axios.put(`/api/entries/${id}`, fields)
+      const updated = res.data.entry
+      if (todayEntry.value?.id === id) {
+        todayEntry.value = updated
+      }
+      const idx = monthEntries.value.findIndex(e => e.id === id)
+      if (idx !== -1) monthEntries.value[idx] = updated
+      return updated
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { todayEntry, monthEntries, cumulativeBalance, loading, fetchToday, fetchMonth, doAction, updateEntry }
 })
