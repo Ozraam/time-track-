@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    container_name: flextime-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATABASE_PATH: /data/database.sqlite
+    volumes:
+      - db_data:/data
+    networks:
+      - flextime
+
+  frontend:
+    build: ./frontend
+    container_name: flextime-frontend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:80"
+    depends_on:
+      - backend
+    networks:
+      - flextime
+
+volumes:
+  db_data:
+
+networks:
+  flextime:
+    driver: bridge

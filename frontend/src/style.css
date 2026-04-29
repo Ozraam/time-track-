@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Prevent iOS from auto-zooming when an input is focused */
+  input, select, textarea {
+    font-size: 1rem;
+  }
+
+  /* Remove 300ms tap delay on all interactive elements */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+}
